@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChatDB Interface</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f9f9f9;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    header {
+      background-color: #4a90e2;
+      color: white;
+      width: 100%;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    main {
+      flex: 1;
+      width: 90%;
+      max-width: 800px;
+      margin: 2rem 0;
+      background: white;
+      padding: 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .controls {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 4px;
+      background-color: #4a90e2;
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    button:hover {
+      background-color: #357ab8;
+    }
+    textarea {
+      width: 100%;
+      height: 4rem;
+      padding: 0.5rem;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      resize: vertical;
+      margin-bottom: 1rem;
+    }
+    #output {
+      margin-top: 1rem;
+      overflow-x: auto;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 0.5rem;
+      text-align: left;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    .sql {
+      background-color: #eef;
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-family: monospace;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ChatDB Natural Language Interface</h1>
+  </header>
+  <main>
+    <div class="controls">
+      <button id="btnSchema">List Schema</button>
+    </div>
+    <textarea id="nlQuery" placeholder="Enter a natural language query..."></textarea>
+    <div class="controls">
+      <button id="btnQuery">Run Query</button>
+    </div>
+    <div id="output"></div>
+  </main>
+
+  <script>
+    const apiBase = 'http://127.0.0.1:5000';
+    const outputEl = document.getElementById('output');
+
+    document.getElementById('btnSchema').addEventListener('click', async () => {
+      clearOutput();
+      try {
+        const res = await fetch(apiBase + '/schema');
+        const data = await res.json();
+        if (res.ok) renderSchema(data);
+        else renderError(data.error || 'Failed to fetch schema');
+      } catch (e) {
+        renderError(e.message);
+      }
+    });
+
+    document.getElementById('btnQuery').addEventListener('click', async () => {
+      clearOutput();
+      const query = document.getElementById('nlQuery').value.trim();
+      if (!query) return renderError('Please enter a query.');
+      try {
+        const res = await fetch(apiBase + '/nl_query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query })
+        });
+        const data = await res.json();
+        if (res.ok) renderResult(data);
+        else renderError(data.error || 'Query failed');
+      } catch (e) {
+        renderError(e.message);
+      }
+    });
+
+    function renderSchema(schema) {
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      ['Table', 'Columns'].forEach(text => { const th = document.createElement('th'); th.textContent = text; headerRow.appendChild(th); });
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      for (const [tbl, cols] of Object.entries(schema)) {
+        const row = document.createElement('tr');
+        const tdName = document.createElement('td'); tdName.textContent = tbl;
+        const tdCols = document.createElement('td'); tdCols.textContent = cols.join(', ');
+        row.appendChild(tdName); row.appendChild(tdCols);
+        tbody.appendChild(row);
+      }
+      table.appendChild(tbody);
+      outputEl.appendChild(table);
+    }
+
+    function renderResult(data) {
+      if (data.sql) {
+        const pre = document.createElement('div');
+        pre.className = 'sql';
+        pre.textContent = data.sql;
+        outputEl.appendChild(pre);
+      }
+      if (data.rows) {
+        renderRows(data.rows);
+      } else if (data.rows_affected !== undefined) {
+        const p = document.createElement('p');
+        p.textContent = `Rows affected: ${data.rows_affected}`;
+        outputEl.appendChild(p);
+      }
+    }
+
+    function renderRows(rows) {
+      if (!rows.length) {
+        outputEl.appendChild(document.createTextNode('No results.'));
+        return;
+      }
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      Object.keys(rows[0]).forEach(col => { const th = document.createElement('th'); th.textContent = col; headerRow.appendChild(th); });
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      rows.forEach(row => {
+        const tr = document.createElement('tr');
+        Object.values(row).forEach(val => {
+          const td = document.createElement('td');
+          td.textContent = val;
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      outputEl.appendChild(table);
+    }
+
+    function renderError(msg) {
+      const p = document.createElement('p');
+      p.style.color = 'red';
+      p.textContent = msg;
+      outputEl.appendChild(p);
+    }
+
+    function clearOutput() {
+      outputEl.innerHTML = '';
+    }
+  </script>
+</body>
+</html>
