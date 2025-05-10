@@ -1,2 +1,4 @@
 # DSCI551
 The final project for DSCI551
+The implementation process for this project. 
+First, open the chatDB.py this file (ensure to correctly set the DB_URL(for the MySQL connection) and OPENAI_API_KEY (LLM API key)in chatDB.py), then open the terminal, use ‘cd’ to direct to the correct folder that has the chatDB.py, then run "python3 chatDB.py", then the Flask web server starts and the link for the web UI will show (I will show which one on the implementation screenshots), then follow the link and the web UI will show, then you can have the natural language input, then the Deep Seek LLM API returns structed SQL in JSON format, then SQL parsing and execution like SELECT data (fetch data) and then INSERT/DELETE/JOIN and so on to modify the data, then show the execution output which is the query response. 
